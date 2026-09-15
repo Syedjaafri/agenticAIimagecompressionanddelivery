@@ -1,0 +1,10 @@
+streamlit>=1.38
+pillow>=10.4
+numpy>=2.0
+pandas>=2.2
+scikit-learn>=1.5
+scikit-image>=0.24
+matplotlib>=3.9
+joblib>=1.4
+langgraph>=0.2
+python-dotenv>=1.0
