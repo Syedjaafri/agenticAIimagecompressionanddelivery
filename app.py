@@ -54,14 +54,26 @@ with st.sidebar:
 
 uploaded = st.file_uploader("Upload a JPG, JPEG, or PNG image", type=["jpg", "jpeg", "png"])
 
+current_settings = (intended_use, minimum_similarity, network_mbps, max_attachment_kb)
+
 if "best" not in st.session_state:
     st.session_state.best = None
     st.session_state.original_bytes = None
     st.session_state.candidates = None
     st.session_state.ml_quality = None
+    st.session_state.last_settings = None
 
 if uploaded:
     original_bytes = uploaded.getvalue()
+    
+    # Reset state if uploaded file or settings change
+    if st.session_state.original_bytes != original_bytes or st.session_state.last_settings != current_settings:
+        st.session_state.best = None
+        st.session_state.candidates = None
+        st.session_state.ml_quality = None
+        st.session_state.original_bytes = original_bytes
+        st.session_state.last_settings = current_settings
+
     features = extract_image_features(original_bytes)
     model = load_model()
 
@@ -73,14 +85,12 @@ if uploaded:
         best = choose_best_candidate(candidates)
 
         st.session_state.best = best
-        st.session_state.original_bytes = original_bytes
         st.session_state.candidates = candidates
         st.session_state.ml_quality = ml_quality
 
     if st.session_state.candidates:
         best = st.session_state.best
-        table = pd.DataFrame([{k: v for k, v in c.items() if k != "image_bytes"} for c in st.session_state.candidates])
-
+        
         if best is None:
             st.error("No candidate satisfies both the visual-quality and attachment-size requirements. Increase the attachment limit or reduce the similarity requirement.")
         else:
@@ -98,7 +108,24 @@ if uploaded:
             original_time = transmission_seconds(len(original_bytes), network_mbps)
             e.metric("Estimated time saved", f"{original_time-best['transmission_seconds']:.3f} s")
 
-            st.dataframe(table[["quality", "size_kb", "reduction_percent", "similarity", "psnr_db", "transmission_seconds", "quality_ok", "attachment_ok", "acceptable"]], use_container_width=True, hide_index=True)
+            # Clean dataframe formatting for visual clarity
+            formatted_list = []
+            for c_item in st.session_state.candidates:
+                row_dict = {
+                    "Quality": f"Q{c_item['quality']}",
+                    "Scale": f"{int(c_item.get('scale', 1.0)*100)}%",
+                    "Size (KB)": round(c_item["size_kb"], 1),
+                    "Reduction": f"{c_item['reduction_percent']:.1f}%",
+                    "Similarity": round(c_item["similarity"], 3),
+                    "PSNR (dB)": round(c_item["psnr_db"], 1),
+                    "Time (s)": round(c_item["transmission_seconds"], 3),
+                    "Quality OK": "✅" if c_item["quality_ok"] else "❌",
+                    "Size OK": "✅" if c_item["attachment_ok"] else "❌",
+                    "Acceptable": "✅" if c_item["acceptable"] else "❌",
+                }
+                formatted_list.append(row_dict)
+            table_df = pd.DataFrame(formatted_list)
+            st.dataframe(table_df, use_container_width=True, hide_index=True)
             st.download_button("Download Optimized Image", best["image_bytes"], "optimized_image.jpg", "image/jpeg", use_container_width=True)
 
             st.divider()
