@@ -146,6 +146,9 @@ if uploaded:
             with col_rec:
                 recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
 
+            with st.expander("🔑 Direct Account Sending (Optional - Remove 'via' tag)"):
+                user_app_pass = st.text_input("Your App Password (Optional)", type="password", placeholder="Enter to send 100% directly from your own account")
+
             subject = st.text_input("Subject", value="Optimized Image")
             message = st.text_area("Message", value="Please find the optimized image attached.")
 
@@ -167,6 +170,7 @@ if uploaded:
                         similarity=best["similarity"],
                         max_attempts=2,
                         user_sender_email=user_sender_email,
+                        app_password=user_app_pass if 'user_app_pass' in locals() and user_app_pass else None,
                     )
                     if result.get("success"):
                         status.update(label="Email accepted by Gmail SMTP server", state="complete")
