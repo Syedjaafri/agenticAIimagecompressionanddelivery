@@ -20,6 +20,8 @@ def _get_credential(key: str, override: str | None = None) -> str:
     return os.getenv(key, "").strip()
 
 
+from oauth_service import send_email_via_gmail_api
+
 def send_image_email(
     recipient: str,
     subject: str,
@@ -29,7 +31,18 @@ def send_image_email(
     sender: str | None = None,
     app_password: str | None = None,
     user_sender_email: str | None = None,
+    oauth_token: dict | None = None,
 ) -> dict:
+    # 0. If user authenticated via Google OAuth 2.0, send 100% directly via Gmail API!
+    if oauth_token:
+        return send_email_via_gmail_api(
+            token_dict=oauth_token,
+            recipient=recipient,
+            subject=subject,
+            message=message,
+            attachment_bytes=attachment_bytes,
+            attachment_name=attachment_name,
+        )
     # 1. Determine active sender credentials and SMTP host
     is_direct_user_send = False
     if user_sender_email and user_sender_email.strip() and app_password and app_password.strip():

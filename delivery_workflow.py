@@ -21,6 +21,7 @@ class DeliveryState(TypedDict):
     sender: NotRequired[str]
     app_password: NotRequired[str]
     user_sender_email: NotRequired[str]
+    oauth_token: NotRequired[dict]
     valid_input: NotRequired[bool]
     success: NotRequired[bool]
     status: NotRequired[str]
@@ -48,6 +49,7 @@ def send_node(state: DeliveryState):
         sender=state.get("sender"),
         app_password=state.get("app_password"),
         user_sender_email=state.get("user_sender_email"),
+        oauth_token=state.get("oauth_token"),
     )
     return {
         "attempts": attempt,
@@ -114,5 +116,6 @@ def deliver_optimized_image(**kwargs) -> DeliveryState:
         "sender": kwargs.get("sender"),
         "app_password": kwargs.get("app_password"),
         "user_sender_email": kwargs.get("user_sender_email"),
+        "oauth_token": kwargs.get("oauth_token"),
     }
     return DELIVERY_AGENT.invoke(state)

@@ -140,12 +140,37 @@ if uploaded:
             st.divider()
             st.subheader("AI Agent Email Delivery")
 
-            col_send, col_rec = st.columns(2)
-            with col_send:
-                user_sender_email = st.text_input("Your Email (Sender)", placeholder="e.g. sender@gmail.com")
-            with col_rec:
-                recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
+            # Check if user returned with OAuth code in URL
+            params = st.query_params
+            if "code" in params and "google_user_token" not in st.session_state:
+                try:
+                    from oauth_service import get_oauth_flow
+                    flow = get_oauth_flow(redirect_uri="https://jaafricompressionsoftware.streamlit.app")
+                    flow.fetch_token(code=params["code"])
+                    creds = flow.credentials
+                    st.session_state.google_user_token = {
+                        "token": creds.token,
+                        "refresh_token": creds.refresh_token,
+                        "token_uri": creds.token_uri,
+                        "client_id": creds.client_id,
+                        "client_secret": creds.client_secret,
+                        "scopes": creds.scopes,
+                    }
+                    st.query_params.clear()
+                    st.success("✅ Successfully signed in with Google!")
+                except Exception as exc:
+                    st.warning(f"Google Sign-In note: {str(exc)}")
 
+            # Display OAuth Login status
+            if "google_user_token" in st.session_state and st.session_state.google_user_token:
+                st.info("✅ **Signed in with Google OAuth 2.0.** Emails will send 100% directly from your personal Gmail account!")
+                if st.button("Sign Out of Google", use_container_width=False):
+                    st.session_state.google_user_token = None
+                    st.rerun()
+            else:
+                st.caption("🔒 **Optional Direct Account Sending:** Connect your Google account to send emails 100% directly from your inbox without entering passwords.")
+
+            recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
             subject = st.text_input("Subject", value="Optimized Image")
             message = st.text_area("Message", value="Please find the optimized image attached.")
 
@@ -153,8 +178,9 @@ if uploaded:
                 with st.status("AI Agent is processing the delivery task...", expanded=True) as status:
                     st.write("Validating recipient and attachment")
                     st.write("Preparing the optimized image attachment")
-                    disp_sender = user_sender_email.strip() if user_sender_email else "Default System Sender"
-                    st.write(f"Sending from `{disp_sender}` to `{recipient}`")
+                    token_dict = st.session_state.get("google_user_token")
+                    mode_msg = "via Google Gmail API (Direct Account)" if token_dict else "via Production SMTP Engine"
+                    st.write(f"Sending optimized image to `{recipient}` ({mode_msg})")
                     result = deliver_optimized_image(
                         recipient=recipient,
                         subject=subject,
@@ -166,7 +192,7 @@ if uploaded:
                         selected_quality=best["quality"],
                         similarity=best["similarity"],
                         max_attempts=2,
-                        user_sender_email=user_sender_email,
+                        oauth_token=token_dict,
                     )
                     if result.get("success"):
                         status.update(label="Email accepted by Gmail SMTP server", state="complete")
