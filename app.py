@@ -169,9 +169,9 @@ if uploaded:
                         auth_url = get_authorization_url(redirect_target)
                         st.link_button("🔑 Sign in with Google", auth_url, type="primary", use_container_width=True)
                     else:
-                        st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Add `google_oauth` credentials in Streamlit Secrets to activate 1-click Google Sign-In).*")
-                except Exception:
-                    st.info("💡 **To send emails directly from your personal account, please Sign In.**")
+                        st.warning("⚠️ **Google Client ID or Client Secret not found in Streamlit Secrets.** Please check your Streamlit Cloud secrets configuration.")
+                except Exception as err:
+                    st.error(f"Sign in setup error: {str(err)}")
 
             col_send, col_rec = st.columns(2)
             with col_send:

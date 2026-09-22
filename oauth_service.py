@@ -14,15 +14,34 @@ SCOPES = [
 
 
 def _get_oauth_config() -> dict:
-    """Retrieve Google OAuth Client ID & Secret from secrets or env."""
+    """Retrieve Google OAuth Client ID & Secret from secrets or env across all schema formats."""
     client_id = ""
     client_secret = ""
+
+    # 1. Check top-level secrets
     try:
-        if "google_oauth" in st.secrets:
-            client_id = str(st.secrets["google_oauth"].get("client_id", "")).strip()
-            client_secret = str(st.secrets["google_oauth"].get("client_secret", "")).strip()
+        if "client_id" in st.secrets:
+            client_id = str(st.secrets["client_id"]).strip()
+        if "client_secret" in st.secrets:
+            client_secret = str(st.secrets["client_secret"]).strip()
     except Exception:
         pass
+
+    # 2. Check google_oauth section in secrets
+    try:
+        if (not client_id or not client_secret) and "google_oauth" in st.secrets:
+            sec = st.secrets["google_oauth"]
+            if hasattr(sec, "get"):
+                client_id = str(sec.get("client_id", client_id)).strip()
+                client_secret = str(sec.get("client_secret", client_secret)).strip()
+    except Exception:
+        pass
+
+    # 3. Check env variables
+    if not client_id:
+        client_id = os.getenv("GOOGLE_CLIENT_ID", os.getenv("CLIENT_ID", "")).strip()
+    if not client_secret:
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET", os.getenv("CLIENT_SECRET", "")).strip()
 
     if "YOUR_CLIENT_ID" in client_id:
         client_id = ""
