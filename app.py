@@ -145,7 +145,8 @@ if uploaded:
             if "code" in params and "google_user_token" not in st.session_state:
                 try:
                     from oauth_service import get_oauth_flow
-                    flow = get_oauth_flow(redirect_uri="https://jaafricompressionsoftware.streamlit.app")
+                    redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
+                    flow = get_oauth_flow(redirect_uri=redirect_target)
                     flow.fetch_token(code=params["code"])
                     creds = flow.credentials
                     st.session_state.google_user_token = {
@@ -172,7 +173,8 @@ if uploaded:
                     from oauth_service import get_oauth_flow, _get_oauth_config
                     config = _get_oauth_config()
                     if config["client_id"] and config["client_secret"]:
-                        flow = get_oauth_flow(redirect_uri="https://jaafricompressionsoftware.streamlit.app")
+                        redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
+                        flow = get_oauth_flow(redirect_uri=redirect_target)
                         auth_url, _ = flow.authorization_url(prompt="consent")
                         st.link_button("🔑 Sign in with Google", auth_url, type="primary", use_container_width=True)
                     else:
