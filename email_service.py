@@ -36,36 +36,25 @@ def send_image_email(
         active_sender = user_sender_email.strip()
         active_pass = app_password.replace(" ", "").strip()
         is_direct_user_send = True
-    else:
-        active_sender = _get_credential("SENDER_EMAIL", sender)
-        active_pass = _get_credential("GMAIL_APP_PASSWORD", app_password).replace(" ", "")
+    server_email = _get_credential("SENDER_EMAIL", sender)
+    app_pass = _get_credential("GMAIL_APP_PASSWORD", app_password).replace(" ", "")
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    port = int(os.getenv("SMTP_PORT", "465"))
 
-    if not active_sender or not active_pass:
+    if not server_email or not app_pass:
         return {
             "success": False,
             "status": "configuration_error",
-            "message": "Sender Email or App Password is missing. Please enter your email and password to send directly.",
+            "message": "Sender Gmail or App Password is missing. Please configure Streamlit Secrets.",
         }
 
-    # Auto-detect SMTP host based on sender email domain
-    domain = active_sender.split("@")[-1].lower() if "@" in active_sender else ""
-    if "outlook" in domain or "hotmail" in domain or "office365" in domain or "annauniv" in domain or "microsoft" in domain:
-        host = "smtp.office365.com"
-        port = 587
-    else:
-        host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-        port = int(os.getenv("SMTP_PORT", "465"))
-
     email = EmailMessage()
-    if is_direct_user_send:
-        email["From"] = active_sender
-        email["Reply-To"] = active_sender
-    elif user_sender_email and user_sender_email.strip():
+    if user_sender_email and user_sender_email.strip():
         sender_identity = user_sender_email.strip()
-        email["From"] = f'"{sender_identity}" <{active_sender}>'
+        email["From"] = f"{sender_identity} via Image Delivery Service <{server_email}>"
         email["Reply-To"] = sender_identity
     else:
-        email["From"] = active_sender
+        email["From"] = server_email
     email["To"] = recipient
     email["Subject"] = subject or "Optimized Image"
     email.set_content(message or "Please find the optimized image attached.")
@@ -76,24 +65,23 @@ def send_image_email(
         if port == 465:
             try:
                 with smtplib.SMTP_SSL(host, 465, context=context, timeout=15) as smtp:
-                    smtp.login(active_sender, active_pass)
+                    smtp.login(server_email, app_pass)
                     smtp.send_message(email)
             except Exception:
                 with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as smtp:
                     smtp.starttls(context=context)
-                    smtp.login(active_sender, active_pass)
+                    smtp.login(server_email, app_pass)
                     smtp.send_message(email)
         else:
             with smtplib.SMTP(host, port, timeout=15) as smtp:
                 smtp.starttls(context=context)
-                smtp.login(active_sender, active_pass)
+                smtp.login(server_email, app_pass)
                 smtp.send_message(email)
 
-        mode_desc = "Directly from sender account" if is_direct_user_send else "Central delivery service"
         return {
             "success": True,
             "status": "accepted_by_smtp_server",
-            "message": f"Email successfully sent directly from {active_sender} ({mode_desc}) to {recipient}.",
+            "message": f"Email successfully sent from {email['From']} to {recipient}.",
         }
     except Exception as exc:
         return {"success": False, "status": "send_error", "message": str(exc)}
