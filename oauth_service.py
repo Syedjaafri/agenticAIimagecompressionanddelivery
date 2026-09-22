@@ -32,19 +32,19 @@ def _get_oauth_config() -> dict:
     return {"client_id": client_id, "client_secret": client_secret}
 
 
-def get_oauth_flow(redirect_uri: str) -> Flow:
+def get_authorization_url(redirect_uri: str) -> str:
+    """Construct standard OAuth 2.0 authorization URL directly without PKCE challenges."""
+    import urllib.parse
     config = _get_oauth_config()
-    client_config = {
-        "web": {
-            "client_id": config["client_id"],
-            "client_secret": config["client_secret"],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
+    params = {
+        "client_id": config["client_id"],
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
     }
-    flow = Flow.from_client_config(client_config, scopes=SCOPES)
-    flow.redirect_uri = redirect_uri
-    return flow
+    return f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}"
 
 
 def exchange_code_for_token(code: str, redirect_uri: str) -> dict:

@@ -162,12 +162,11 @@ if uploaded:
                     st.rerun()
             else:
                 try:
-                    from oauth_service import get_oauth_flow, _get_oauth_config
+                    from oauth_service import get_authorization_url, _get_oauth_config
                     config = _get_oauth_config()
                     if config["client_id"] and config["client_secret"]:
                         redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
-                        flow = get_oauth_flow(redirect_uri=redirect_target)
-                        auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+                        auth_url = get_authorization_url(redirect_target)
                         st.link_button("🔑 Sign in with Google", auth_url, type="primary", use_container_width=True)
                     else:
                         st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Add `google_oauth` credentials in Streamlit Secrets to activate 1-click Google Sign-In).*")
