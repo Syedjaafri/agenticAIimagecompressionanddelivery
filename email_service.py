@@ -8,23 +8,41 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _get_credential(key: str, override: str | None = None) -> str:
+    if override and override.strip():
+        return override.strip()
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return str(st.secrets[key]).strip()
+    except Exception:
+        pass
+    return os.getenv(key, "").strip()
+
+
 def send_image_email(
     recipient: str,
     subject: str,
     message: str,
     attachment_bytes: bytes,
     attachment_name: str = "optimized_image.jpg",
+    sender: str | None = None,
+    app_password: str | None = None,
 ) -> dict:
-    sender = os.getenv("SENDER_EMAIL", "").strip()
-    app_password = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "").strip()
+    sender_email = _get_credential("SENDER_EMAIL", sender)
+    app_pass = _get_credential("GMAIL_APP_PASSWORD", app_password).replace(" ", "")
     host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
     port = int(os.getenv("SMTP_PORT", "465"))
 
-    if not sender or not app_password:
-        return {"success": False, "status": "configuration_error", "message": "Sender Gmail or App Password is missing."}
+    if not sender_email or not app_pass:
+        return {
+            "success": False,
+            "status": "configuration_error",
+            "message": "Sender Gmail or App Password is missing. Please configure Streamlit Secrets or enter Sender Credentials in the app settings.",
+        }
 
     email = EmailMessage()
-    email["From"] = sender
+    email["From"] = sender_email
     email["To"] = recipient
     email["Subject"] = subject or "Optimized Image"
     email.set_content(message or "Please find the optimized image attached.")
@@ -33,12 +51,13 @@ def send_image_email(
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
-            smtp.login(sender, app_password)
+            smtp.login(sender_email, app_pass)
             smtp.send_message(email)
         return {
             "success": True,
             "status": "accepted_by_smtp_server",
-            "message": "Email was accepted by the Gmail SMTP server.",
+            "message": f"Email successfully sent from {sender_email} and accepted by the Gmail SMTP server.",
         }
     except Exception as exc:
         return {"success": False, "status": "send_error", "message": str(exc)}
+

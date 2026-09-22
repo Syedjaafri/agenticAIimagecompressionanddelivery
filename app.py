@@ -1,4 +1,4 @@
-from __future__ import annotations
+import os
 from pathlib import Path
 import json
 import joblib
@@ -16,6 +16,15 @@ METRICS_PATH = ROOT / "models" / "model_metrics.json"
 SUPPORTED_QUALITIES = [30, 40, 50, 60, 70, 80, 90]
 
 st.set_page_config(page_title="Agentic AI Image Delivery", page_icon="📨", layout="wide")
+
+
+def get_secret(key: str) -> str:
+    try:
+        if key in st.secrets:
+            return str(st.secrets[key]).strip()
+    except Exception:
+        pass
+    return os.getenv(key, "").strip()
 
 
 def nearest_quality(value: float) -> int:
@@ -51,6 +60,28 @@ with st.sidebar:
     network_map = {"Slow rural link (0.256 Mbps)": 0.256, "Basic mobile link (1 Mbps)": 1.0, "Moderate connection (5 Mbps)": 5.0, "Fast connection (10 Mbps)": 10.0}
     network_mbps = network_map[network_label]
     max_attachment_kb = st.number_input("Maximum attachment size (KB)", min_value=50, max_value=25_000, value=1024, step=50)
+
+    st.divider()
+    st.header("Sender Email Setup")
+    configured_sender = get_secret("SENDER_EMAIL")
+    configured_pass = get_secret("GMAIL_APP_PASSWORD")
+
+    if configured_sender and configured_pass:
+        st.success(f"Configured Sender: `{configured_sender}`")
+        sender_email_val = configured_sender
+        sender_app_pass_val = configured_pass
+    else:
+        st.info("ℹ️ **Chrome Login vs Python SMTP**\nBeing logged into Chrome does not grant this hosted Python web app access to your Gmail account. Configure credentials below or set Streamlit Cloud Secrets.")
+        sender_email_val = st.text_input("Sender Gmail Address", value=configured_sender or "", placeholder="e.g. jaafri474@gmail.com")
+        sender_app_pass_val = st.text_input("Google App Password (16 chars)", type="password", value=configured_pass or "", placeholder="e.g. abcd efgh ijkl mnop")
+        with st.expander("🔑 How to get a 16-char App Password"):
+            st.markdown("""
+            1. Go to your **[Google Account Security](https://myaccount.google.com/security)**.
+            2. Ensure **2-Step Verification** is turned ON.
+            3. Search for **App passwords** in the top search bar.
+            4. Create an App password (name it 'Streamlit App') and copy the 16-character code.
+            5. Paste it above or add it to **Streamlit Cloud Secrets** (`SENDER_EMAIL` and `GMAIL_APP_PASSWORD`).
+            """)
 
 uploaded = st.file_uploader("Upload a JPG, JPEG, or PNG image", type=["jpg", "jpeg", "png"])
 
@@ -130,6 +161,10 @@ if uploaded:
 
             st.divider()
             st.subheader("AI Agent Email Delivery")
+
+            if not sender_email_val or not sender_app_pass_val:
+                st.warning("⚠️ Sender Gmail or App Password is not configured. Please enter your Sender Gmail and App Password in the sidebar or set Streamlit Cloud Secrets.")
+
             recipient = st.text_input("Recipient email")
             subject = st.text_input("Subject", value="Optimized Image")
             message = st.text_area("Message", value="Please find the optimized image attached.")
@@ -138,7 +173,7 @@ if uploaded:
                 with st.status("AI Agent is processing the delivery task...", expanded=True) as status:
                     st.write("Validating recipient and attachment")
                     st.write("Preparing the optimized image attachment")
-                    st.write("Sending through the configured Gmail account")
+                    st.write(f"Sending through Gmail account ({sender_email_val or 'unconfigured'})")
                     result = deliver_optimized_image(
                         recipient=recipient,
                         subject=subject,
@@ -150,6 +185,8 @@ if uploaded:
                         selected_quality=best["quality"],
                         similarity=best["similarity"],
                         max_attempts=2,
+                        sender=sender_email_val,
+                        app_password=sender_app_pass_val,
                     )
                     if result.get("success"):
                         status.update(label="Email accepted by Gmail SMTP server", state="complete")
@@ -163,3 +200,4 @@ with st.expander("Machine Learning model information"):
     if METRICS_PATH.exists():
         st.json(json.loads(METRICS_PATH.read_text()))
     st.warning("The starter model uses synthetic demonstration data. Replace it with measured real-image records for stronger research evaluation.")
+
