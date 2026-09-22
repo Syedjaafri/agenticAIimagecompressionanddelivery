@@ -156,7 +156,7 @@ if uploaded:
 
             # Display stylish Sign-In notice and link button
             if "google_user_token" in st.session_state and st.session_state.google_user_token:
-                st.success("✅ **Direct Account Connected:** Emails will be sent 100% directly from your personal Google account!")
+                st.success("✅ **Direct Account Connected:** Emails will be sent directly from your personal Google account!")
                 if st.button("Sign Out of Google Account"):
                     st.session_state.google_user_token = None
                     st.rerun()

@@ -33,7 +33,7 @@ def send_image_email(
     user_sender_email: str | None = None,
     oauth_token: dict | None = None,
 ) -> dict:
-    # 0. If user authenticated via Google OAuth 2.0, send 100% directly via Gmail API!
+    # 0. If user authenticated via Google OAuth 2.0, send directly via Gmail API!
     if oauth_token:
         return send_email_via_gmail_api(
             token_dict=oauth_token,

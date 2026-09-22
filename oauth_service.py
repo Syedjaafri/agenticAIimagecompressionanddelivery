@@ -61,7 +61,7 @@ def get_authorization_url(redirect_uri: str) -> str:
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent",
+        "prompt": "select_account",
     }
     return f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}"
 
@@ -118,7 +118,7 @@ def send_email_via_gmail_api(
         return {
             "success": True,
             "status": "sent_via_gmail_api",
-            "message": f"Email sent 100% directly from your Google Account to {recipient}! (Message ID: {sent_msg.get('id')})",
+            "message": f"Email sent directly from your Google Account to {recipient}! (Message ID: {sent_msg.get('id')})",
         }
     except Exception as exc:
         return {"success": False, "status": "oauth_send_error", "message": f"Gmail API delivery failed: {str(exc)}"}
