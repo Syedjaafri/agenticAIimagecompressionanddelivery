@@ -47,6 +47,33 @@ def get_oauth_flow(redirect_uri: str) -> Flow:
     return flow
 
 
+def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
+    """Exchange authorization code directly via Google OAuth REST API to avoid state mismatch."""
+    import requests
+    config = _get_oauth_config()
+    payload = {
+        "code": code,
+        "client_id": config["client_id"],
+        "client_secret": config["client_secret"],
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=15)
+    data = resp.json()
+    if "access_token" in data:
+        return {
+            "token": data["access_token"],
+            "refresh_token": data.get("refresh_token", ""),
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": config["client_id"],
+            "client_secret": config["client_secret"],
+            "scopes": SCOPES,
+        }
+    else:
+        err_msg = data.get("error_description", data.get("error", "OAuth exchange failed"))
+        raise Exception(f"Google Token Exchange Error: {err_msg}")
+
+
 def send_email_via_gmail_api(
     token_dict: dict,
     recipient: str,

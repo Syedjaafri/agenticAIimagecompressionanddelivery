@@ -144,19 +144,9 @@ if uploaded:
             params = st.query_params
             if "code" in params and "google_user_token" not in st.session_state:
                 try:
-                    from oauth_service import get_oauth_flow
+                    from oauth_service import exchange_code_for_token
                     redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
-                    flow = get_oauth_flow(redirect_uri=redirect_target)
-                    flow.fetch_token(code=params["code"])
-                    creds = flow.credentials
-                    st.session_state.google_user_token = {
-                        "token": creds.token,
-                        "refresh_token": creds.refresh_token,
-                        "token_uri": creds.token_uri,
-                        "client_id": creds.client_id,
-                        "client_secret": creds.client_secret,
-                        "scopes": creds.scopes,
-                    }
+                    st.session_state.google_user_token = exchange_code_for_token(params["code"], redirect_target)
                     st.query_params.clear()
                     st.success("✅ Successfully signed in with Google!")
                     st.rerun()
