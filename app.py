@@ -159,6 +159,7 @@ if uploaded:
                     }
                     st.query_params.clear()
                     st.success("✅ Successfully signed in with Google!")
+                    st.rerun()
                 except Exception as exc:
                     st.query_params.clear()
                     st.warning(f"Google Sign-In note: {str(exc)}")
@@ -176,7 +177,7 @@ if uploaded:
                     if config["client_id"] and config["client_secret"]:
                         redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
                         flow = get_oauth_flow(redirect_uri=redirect_target)
-                        auth_url, _ = flow.authorization_url(prompt="consent")
+                        auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
                         st.link_button("🔑 Sign in with Google", auth_url, type="primary", use_container_width=True)
                     else:
                         st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Add `google_oauth` credentials in Streamlit Secrets to activate 1-click Google Sign-In).*")
@@ -214,7 +215,7 @@ if uploaded:
                         oauth_token=token_dict,
                     )
                     if result.get("success"):
-                        status.update(label="Email accepted by Gmail SMTP server", state="complete")
+                        status.update(label=result.get("result_message", "Email delivered successfully"), state="complete")
                         st.success(result.get("result_message"))
                     else:
                         status.update(label="Delivery failed; download fallback remains available", state="error")
