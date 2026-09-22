@@ -140,7 +140,12 @@ if uploaded:
             st.divider()
             st.subheader("AI Agent Email Delivery")
 
-            recipient = st.text_input("Recipient email")
+            col_send, col_rec = st.columns(2)
+            with col_send:
+                user_sender_email = st.text_input("Your Email (Sender)", placeholder="e.g. sender@gmail.com")
+            with col_rec:
+                recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
+
             subject = st.text_input("Subject", value="Optimized Image")
             message = st.text_area("Message", value="Please find the optimized image attached.")
 
@@ -148,7 +153,8 @@ if uploaded:
                 with st.status("AI Agent is processing the delivery task...", expanded=True) as status:
                     st.write("Validating recipient and attachment")
                     st.write("Preparing the optimized image attachment")
-                    st.write("Sending through configured Gmail SMTP server")
+                    disp_sender = user_sender_email.strip() if user_sender_email else "Default System Sender"
+                    st.write(f"Sending from `{disp_sender}` to `{recipient}`")
                     result = deliver_optimized_image(
                         recipient=recipient,
                         subject=subject,
@@ -160,6 +166,7 @@ if uploaded:
                         selected_quality=best["quality"],
                         similarity=best["similarity"],
                         max_attempts=2,
+                        user_sender_email=user_sender_email,
                     )
                     if result.get("success"):
                         status.update(label="Email accepted by Gmail SMTP server", state="complete")

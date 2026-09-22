@@ -28,13 +28,14 @@ def send_image_email(
     attachment_name: str = "optimized_image.jpg",
     sender: str | None = None,
     app_password: str | None = None,
+    user_sender_email: str | None = None,
 ) -> dict:
-    sender_email = _get_credential("SENDER_EMAIL", sender)
+    server_email = _get_credential("SENDER_EMAIL", sender)
     app_pass = _get_credential("GMAIL_APP_PASSWORD", app_password).replace(" ", "")
     host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
     port = int(os.getenv("SMTP_PORT", "465"))
 
-    if not sender_email or not app_pass:
+    if not server_email or not app_pass:
         return {
             "success": False,
             "status": "configuration_error",
@@ -42,7 +43,13 @@ def send_image_email(
         }
 
     email = EmailMessage()
-    email["From"] = sender_email
+    if user_sender_email and user_sender_email.strip():
+        display_sender = user_sender_email.strip()
+        email["From"] = f"{display_sender} via Image Delivery Service <{server_email}>"
+        email["Reply-To"] = display_sender
+    else:
+        email["From"] = server_email
+
     email["To"] = recipient
     email["Subject"] = subject or "Optimized Image"
     email.set_content(message or "Please find the optimized image attached.")
