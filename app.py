@@ -138,7 +138,7 @@ if uploaded:
             st.download_button("Download Optimized Image", best["image_bytes"], "optimized_image.jpg", "image/jpeg", use_container_width=True)
 
             st.divider()
-            st.subheader("AI Agent Email Delivery")
+            st.subheader("📬 AI Agent Email Delivery")
 
             # Check if user returned with OAuth code in URL
             params = st.query_params
@@ -161,14 +161,14 @@ if uploaded:
                 except Exception as exc:
                     st.warning(f"Google Sign-In note: {str(exc)}")
 
-            # Display OAuth Login status
+            # Display stylish Sign-In notice
             if "google_user_token" in st.session_state and st.session_state.google_user_token:
-                st.info("✅ **Signed in with Google OAuth 2.0.** Emails will send 100% directly from your personal Gmail account!")
-                if st.button("Sign Out of Google", use_container_width=False):
+                st.success("✅ **Direct Account Connected:** Emails will be sent 100% directly from your personal Google account!")
+                if st.button("Sign Out of Google Account"):
                     st.session_state.google_user_token = None
                     st.rerun()
             else:
-                st.caption("🔒 **Optional Direct Account Sending:** Connect your Google account to send emails 100% directly from your inbox without entering passwords.")
+                st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Standard delivery uses our secure production server).*")
 
             recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
             subject = st.text_input("Subject", value="Optimized Image")
