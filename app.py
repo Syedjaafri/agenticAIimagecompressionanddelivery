@@ -161,14 +161,24 @@ if uploaded:
                 except Exception as exc:
                     st.warning(f"Google Sign-In note: {str(exc)}")
 
-            # Display stylish Sign-In notice
+            # Display stylish Sign-In notice and link button
             if "google_user_token" in st.session_state and st.session_state.google_user_token:
                 st.success("✅ **Direct Account Connected:** Emails will be sent 100% directly from your personal Google account!")
                 if st.button("Sign Out of Google Account"):
                     st.session_state.google_user_token = None
                     st.rerun()
             else:
-                st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Standard delivery uses our secure production server).*")
+                try:
+                    from oauth_service import get_oauth_flow, _get_oauth_config
+                    config = _get_oauth_config()
+                    if config["client_id"] and config["client_secret"]:
+                        flow = get_oauth_flow(redirect_uri="https://jaafricompressionsoftware.streamlit.app")
+                        auth_url, _ = flow.authorization_url(prompt="consent")
+                        st.link_button("🔑 Sign in with Google", auth_url, type="primary", use_container_width=True)
+                    else:
+                        st.info("💡 **To send emails directly from your personal account, please Sign In.**\n\n*(Add `google_oauth` credentials in Streamlit Secrets to activate 1-click Google Sign-In).*")
+                except Exception:
+                    st.info("💡 **To send emails directly from your personal account, please Sign In.**")
 
             recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
             subject = st.text_input("Subject", value="Optimized Image")
