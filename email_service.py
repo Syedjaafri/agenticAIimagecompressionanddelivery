@@ -60,24 +60,24 @@ def send_image_email(
         if port == 465:
             try:
                 with smtplib.SMTP_SSL(host, 465, context=context, timeout=15) as smtp:
-                    smtp.login(sender_email, app_pass)
+                    smtp.login(server_email, app_pass)
                     smtp.send_message(email)
             except Exception:
                 # Fallback to Port 587 TLS if Port 465 is blocked by network firewall
                 with smtplib.SMTP(host, 587, timeout=15) as smtp:
                     smtp.starttls(context=context)
-                    smtp.login(sender_email, app_pass)
+                    smtp.login(server_email, app_pass)
                     smtp.send_message(email)
         else:
             with smtplib.SMTP(host, port, timeout=15) as smtp:
                 smtp.starttls(context=context)
-                smtp.login(sender_email, app_pass)
+                smtp.login(server_email, app_pass)
                 smtp.send_message(email)
 
         return {
             "success": True,
             "status": "accepted_by_smtp_server",
-            "message": f"Email successfully sent from {sender_email} and accepted by the Gmail SMTP server.",
+            "message": f"Email successfully sent from {server_email} and accepted by the Gmail SMTP server.",
         }
     except Exception as exc:
         return {"success": False, "status": "send_error", "message": str(exc)}
