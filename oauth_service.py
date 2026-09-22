@@ -24,10 +24,10 @@ def _get_oauth_config() -> dict:
     except Exception:
         pass
 
-    if not client_id:
-        client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-    if not client_secret:
-        client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    if "YOUR_CLIENT_ID" in client_id:
+        client_id = ""
+    if "YOUR_CLIENT_SECRET" in client_secret:
+        client_secret = ""
 
     return {"client_id": client_id, "client_secret": client_secret}
 
