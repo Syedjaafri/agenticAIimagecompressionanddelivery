@@ -61,31 +61,6 @@ with st.sidebar:
     network_mbps = network_map[network_label]
     max_attachment_kb = st.number_input("Maximum attachment size (KB)", min_value=50, max_value=25_000, value=1024, step=50)
 
-    st.divider()
-    st.header("Sender Email Setup")
-    configured_sender = get_secret("SENDER_EMAIL")
-    configured_pass = get_secret("GMAIL_APP_PASSWORD")
-
-    if configured_sender:
-        st.write(f"**Sender Gmail:** `{configured_sender}`")
-        sender_email_val = configured_sender
-    else:
-        sender_email_val = st.text_input("Sender Gmail Address", placeholder="e.g. jaafri474@gmail.com")
-
-    if configured_pass:
-        st.success("App Password configured via Secrets.")
-        sender_app_pass_val = configured_pass
-    else:
-        sender_app_pass_val = st.text_input("Google App Password (16 chars)", type="password", placeholder="e.g. abcd efgh ijkl mnop")
-        with st.expander("🔑 How to get a 16-char App Password"):
-            st.markdown("""
-            1. Go to your **[Google Account Security](https://myaccount.google.com/security)**.
-            2. Ensure **2-Step Verification** is turned ON.
-            3. Search for **App passwords** in the top search bar.
-            4. Create an App password (name it 'Streamlit App') and copy the 16-character code.
-            5. Paste it above or add it to **Streamlit Cloud Secrets** (`SENDER_EMAIL` and `GMAIL_APP_PASSWORD`).
-            """)
-
 uploaded = st.file_uploader("Upload a JPG, JPEG, or PNG image", type=["jpg", "jpeg", "png"])
 
 current_settings = (intended_use, minimum_similarity, network_mbps, max_attachment_kb)
@@ -165,9 +140,6 @@ if uploaded:
             st.divider()
             st.subheader("AI Agent Email Delivery")
 
-            if not sender_email_val or not sender_app_pass_val:
-                st.warning("⚠️ Sender Gmail or App Password is not configured. Please enter your Sender Gmail and App Password in the sidebar or set Streamlit Cloud Secrets.")
-
             recipient = st.text_input("Recipient email")
             subject = st.text_input("Subject", value="Optimized Image")
             message = st.text_area("Message", value="Please find the optimized image attached.")
@@ -176,7 +148,7 @@ if uploaded:
                 with st.status("AI Agent is processing the delivery task...", expanded=True) as status:
                     st.write("Validating recipient and attachment")
                     st.write("Preparing the optimized image attachment")
-                    st.write(f"Sending through Gmail account ({sender_email_val or 'unconfigured'})")
+                    st.write("Sending through configured Gmail SMTP server")
                     result = deliver_optimized_image(
                         recipient=recipient,
                         subject=subject,
@@ -188,8 +160,6 @@ if uploaded:
                         selected_quality=best["quality"],
                         similarity=best["similarity"],
                         max_attempts=2,
-                        sender=sender_email_val,
-                        app_password=sender_app_pass_val,
                     )
                     if result.get("success"):
                         status.update(label="Email accepted by Gmail SMTP server", state="complete")
