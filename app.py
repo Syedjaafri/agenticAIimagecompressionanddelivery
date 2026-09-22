@@ -66,14 +66,17 @@ with st.sidebar:
     configured_sender = get_secret("SENDER_EMAIL")
     configured_pass = get_secret("GMAIL_APP_PASSWORD")
 
-    if configured_sender and configured_pass:
-        st.success(f"Configured Sender: `{configured_sender}`")
+    if configured_sender:
+        st.write(f"**Sender Gmail:** `{configured_sender}`")
         sender_email_val = configured_sender
+    else:
+        sender_email_val = st.text_input("Sender Gmail Address", placeholder="e.g. jaafri474@gmail.com")
+
+    if configured_pass:
+        st.success("App Password configured via Secrets.")
         sender_app_pass_val = configured_pass
     else:
-        st.info("ℹ️ **Chrome Login vs Python SMTP**\nBeing logged into Chrome does not grant this hosted Python web app access to your Gmail account. Configure credentials below or set Streamlit Cloud Secrets.")
-        sender_email_val = st.text_input("Sender Gmail Address", value=configured_sender or "", placeholder="e.g. jaafri474@gmail.com")
-        sender_app_pass_val = st.text_input("Google App Password (16 chars)", type="password", value=configured_pass or "", placeholder="e.g. abcd efgh ijkl mnop")
+        sender_app_pass_val = st.text_input("Google App Password (16 chars)", type="password", placeholder="e.g. abcd efgh ijkl mnop")
         with st.expander("🔑 How to get a 16-char App Password"):
             st.markdown("""
             1. Go to your **[Google Account Security](https://myaccount.google.com/security)**.
