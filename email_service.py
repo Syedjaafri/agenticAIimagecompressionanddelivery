@@ -57,8 +57,15 @@ def send_image_email(
         port = int(os.getenv("SMTP_PORT", "465"))
 
     email = EmailMessage()
-    email["From"] = active_sender  # 100% Direct Sender address (No 'via' tag!)
-    email["Reply-To"] = active_sender
+    if is_direct_user_send:
+        email["From"] = active_sender
+        email["Reply-To"] = active_sender
+    elif user_sender_email and user_sender_email.strip():
+        sender_identity = user_sender_email.strip()
+        email["From"] = f'"{sender_identity}" <{active_sender}>'
+        email["Reply-To"] = sender_identity
+    else:
+        email["From"] = active_sender
     email["To"] = recipient
     email["Subject"] = subject or "Optimized Image"
     email.set_content(message or "Please find the optimized image attached.")
