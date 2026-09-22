@@ -64,10 +64,10 @@ def send_image_email(
     email = EmailMessage()
     if user_sender_email and user_sender_email.strip():
         sender_identity = user_sender_email.strip()
-        email["From"] = f"{sender_identity} via Image Delivery Service <{server_email}>"
+        email["From"] = f"Image Delivery Service <{server_email}>"
         email["Reply-To"] = sender_identity
     else:
-        email["From"] = server_email
+        email["From"] = f"Image Delivery Service <{server_email}>"
     email["To"] = recipient
     email["Subject"] = subject or "Optimized Image"
     email.set_content(message or "Please find the optimized image attached.")
