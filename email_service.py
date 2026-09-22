@@ -50,9 +50,23 @@ def send_image_email(
 
     try:
         context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
-            smtp.login(sender_email, app_pass)
-            smtp.send_message(email)
+        if port == 465:
+            try:
+                with smtplib.SMTP_SSL(host, 465, context=context, timeout=15) as smtp:
+                    smtp.login(sender_email, app_pass)
+                    smtp.send_message(email)
+            except Exception:
+                # Fallback to Port 587 TLS if Port 465 is blocked by network firewall
+                with smtplib.SMTP(host, 587, timeout=15) as smtp:
+                    smtp.starttls(context=context)
+                    smtp.login(sender_email, app_pass)
+                    smtp.send_message(email)
+        else:
+            with smtplib.SMTP(host, port, timeout=15) as smtp:
+                smtp.starttls(context=context)
+                smtp.login(sender_email, app_pass)
+                smtp.send_message(email)
+
         return {
             "success": True,
             "status": "accepted_by_smtp_server",
