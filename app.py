@@ -160,6 +160,7 @@ if uploaded:
                     st.query_params.clear()
                     st.success("✅ Successfully signed in with Google!")
                 except Exception as exc:
+                    st.query_params.clear()
                     st.warning(f"Google Sign-In note: {str(exc)}")
 
             # Display stylish Sign-In notice and link button
