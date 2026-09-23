@@ -103,7 +103,15 @@ def send_email_via_gmail_api(
 ) -> dict:
     """Send email directly from authenticated user's account using Google Gmail API."""
     try:
-        creds = Credentials.from_authorized_user_info(token_dict, SCOPES)
+        refresh_token = token_dict.get("refresh_token", "") if isinstance(token_dict, dict) else ""
+        if refresh_token and refresh_token.strip():
+            try:
+                creds = Credentials.from_authorized_user_info(token_dict, SCOPES)
+            except Exception:
+                creds = Credentials(token=token_dict.get("token", ""), scopes=SCOPES)
+        else:
+            creds = Credentials(token=token_dict.get("token", ""), scopes=SCOPES)
+
         service = build("gmail", "v1", credentials=creds)
 
         email = EmailMessage()
