@@ -158,21 +158,8 @@ if uploaded:
             if "google_user_token" in st.session_state and st.session_state.google_user_token:
                 token_data = st.session_state.google_user_token
                 user_email_disp = token_data.get("user_email") if isinstance(token_data, dict) else ""
-                has_refresh = bool(token_data.get("refresh_token")) if isinstance(token_data, dict) else False
-                
-                if has_refresh:
-                    st.success(f"✅ **Direct Account Connected:** Emails will be sent directly from **{user_email_disp or 'your personal Google account'}**!")
-                else:
-                    st.warning(f"⚠️ **Google Account Connected ({user_email_disp or 'Active Account'})**: Your session token does not have an offline refresh grant and will expire. Reconnect once below to ensure permanent uninterrupted delivery.")
-                    try:
-                        from oauth_service import get_authorization_url, _get_oauth_config
-                        config = _get_oauth_config()
-                        if config["client_id"] and config["client_secret"]:
-                            redirect_target = "https://jaafricompressionsoftware.streamlit.app/"
-                            reauth_url = get_authorization_url(redirect_target)
-                            st.link_button("🔄 Reconnect Google Account (Permanent Refresh)", reauth_url, type="primary", use_container_width=True)
-                    except Exception:
-                        pass
+                disp_target = user_email_disp if user_email_disp else "your personal Google account"
+                st.success(f"✅ **Direct Account Connected:** Emails will be sent directly from **{disp_target}**!")
 
                 if st.button("Sign Out of Google Account"):
                     st.session_state.google_user_token = None
@@ -226,16 +213,14 @@ if uploaded:
                     if result.get("success"):
                         status.update(label=result.get("result_message", "Email delivered successfully"), state="complete")
                         st.success(result.get("result_message"))
-                        if result.get("oauth_token_expired"):
-                            st.session_state.google_user_token = None
-                            st.info("ℹ️ Your direct Google Account session had expired, so the email was safely sent via backup delivery service. Please sign in again with Google to re-link your direct account.")
                     else:
                         status.update(label="Delivery failed; download fallback remains available", state="error")
-                        st.error(result.get("result_message"))
-                        st.info(f"Attempts made: {result.get('attempts', 0)}")
                         if result.get("oauth_token_expired"):
                             st.session_state.google_user_token = None
-                            st.info("ℹ️ The expired Google session was automatically cleared. Please re-authenticate or use standard delivery.")
+                            st.error("⚠️ Your Google login session expired. Please click 'Sign in with Google' above to re-connect and send.")
+                        else:
+                            st.error(result.get("result_message"))
+                            st.info(f"Attempts made: {result.get('attempts', 0)}")
 
 with st.expander("Machine Learning model information"):
     if METRICS_PATH.exists():

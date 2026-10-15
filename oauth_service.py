@@ -64,10 +64,10 @@ def get_authorization_url(redirect_uri: str) -> str:
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent select_account",
+        "prompt": "consent",
         "include_granted_scopes": "true",
     }
-    return f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}"
+    return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
 
 
 def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
@@ -96,9 +96,19 @@ def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
         except Exception:
             pass
 
+        # If Google omitted refresh_token on re-auth, preserve existing valid refresh_token
+        existing_refresh = ""
+        try:
+            if "google_user_token" in st.session_state and isinstance(st.session_state.google_user_token, dict):
+                existing_refresh = st.session_state.google_user_token.get("refresh_token", "")
+        except Exception:
+            pass
+
+        refresh_token = data.get("refresh_token") or existing_refresh
+
         return {
             "token": data["access_token"],
-            "refresh_token": data.get("refresh_token", ""),
+            "refresh_token": refresh_token,
             "token_uri": "https://oauth2.googleapis.com/token",
             "client_id": config["client_id"],
             "client_secret": config["client_secret"],

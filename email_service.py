@@ -88,16 +88,16 @@ def send_image_email(
         context = ssl.create_default_context()
         if port == 465:
             try:
-                with smtplib.SMTP_SSL(host, 465, context=context, timeout=15) as smtp:
+                with smtplib.SMTP_SSL(host, 465, context=context, timeout=5) as smtp:
                     smtp.login(server_email, app_pass)
                     smtp.send_message(email)
             except Exception:
-                with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as smtp:
+                with smtplib.SMTP("smtp.gmail.com", 587, timeout=5) as smtp:
                     smtp.starttls(context=context)
                     smtp.login(server_email, app_pass)
                     smtp.send_message(email)
         else:
-            with smtplib.SMTP(host, port, timeout=15) as smtp:
+            with smtplib.SMTP(host, port, timeout=5) as smtp:
                 smtp.starttls(context=context)
                 smtp.login(server_email, app_pass)
                 smtp.send_message(email)
