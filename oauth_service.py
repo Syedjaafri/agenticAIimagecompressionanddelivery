@@ -4,7 +4,6 @@ import base64
 from email.message import EmailMessage
 import streamlit as st
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 SCOPES = [
@@ -24,6 +23,10 @@ def _get_oauth_config() -> dict:
             client_id = str(st.secrets["client_id"]).strip()
         if "client_secret" in st.secrets:
             client_secret = str(st.secrets["client_secret"]).strip()
+        if "GOOGLE_CLIENT_ID" in st.secrets:
+            client_id = str(st.secrets["GOOGLE_CLIENT_ID"]).strip()
+        if "GOOGLE_CLIENT_SECRET" in st.secrets:
+            client_secret = str(st.secrets["GOOGLE_CLIENT_SECRET"]).strip()
     except Exception:
         pass
 
@@ -32,8 +35,8 @@ def _get_oauth_config() -> dict:
         if (not client_id or not client_secret) and "google_oauth" in st.secrets:
             sec = st.secrets["google_oauth"]
             if hasattr(sec, "get"):
-                client_id = str(sec.get("client_id", client_id)).strip()
-                client_secret = str(sec.get("client_secret", client_secret)).strip()
+                client_id = str(sec.get("client_id", sec.get("GOOGLE_CLIENT_ID", client_id))).strip()
+                client_secret = str(sec.get("client_secret", sec.get("GOOGLE_CLIENT_SECRET", client_secret))).strip()
     except Exception:
         pass
 
@@ -52,7 +55,7 @@ def _get_oauth_config() -> dict:
 
 
 def get_authorization_url(redirect_uri: str) -> str:
-    """Construct standard OAuth 2.0 authorization URL directly without PKCE challenges."""
+    """Construct standard OAuth 2.0 authorization URL requesting offline access and refresh consent."""
     import urllib.parse
     config = _get_oauth_config()
     params = {
@@ -61,13 +64,14 @@ def get_authorization_url(redirect_uri: str) -> str:
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "select_account",
+        "prompt": "consent select_account",
+        "include_granted_scopes": "true",
     }
     return f"https://accounts.google.com/o/oauth2/auth?{urllib.parse.urlencode(params)}"
 
 
 def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
-    """Exchange authorization code directly via Google OAuth REST API to avoid state mismatch."""
+    """Exchange authorization code directly via Google OAuth REST API and fetch user profile."""
     import requests
     config = _get_oauth_config()
     payload = {
@@ -80,6 +84,18 @@ def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
     resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=15)
     data = resp.json()
     if "access_token" in data:
+        user_email = ""
+        try:
+            user_resp = requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {data['access_token']}"},
+                timeout=10,
+            )
+            if user_resp.status_code == 200:
+                user_email = user_resp.json().get("email", "")
+        except Exception:
+            pass
+
         return {
             "token": data["access_token"],
             "refresh_token": data.get("refresh_token", ""),
@@ -87,6 +103,7 @@ def exchange_code_for_token(code: str, redirect_uri: str) -> dict:
             "client_id": config["client_id"],
             "client_secret": config["client_secret"],
             "scopes": SCOPES,
+            "user_email": user_email,
         }
     else:
         err_msg = data.get("error_description", data.get("error", "OAuth exchange failed"))
@@ -101,16 +118,42 @@ def send_email_via_gmail_api(
     attachment_bytes: bytes,
     attachment_name: str = "optimized_image.jpg",
 ) -> dict:
-    """Send email directly from authenticated user's account using Google Gmail API."""
+    """Send email directly from authenticated user's account using Google Gmail API with auto-refresh."""
+    if not isinstance(token_dict, dict) or not token_dict.get("token"):
+        return {
+            "success": False,
+            "status": "missing_token",
+            "message": "Direct Google connection token is missing. Please sign in again.",
+            "token_expired": True,
+        }
+
+    config = _get_oauth_config()
+    client_id = token_dict.get("client_id") or config.get("client_id", "")
+    client_secret = token_dict.get("client_secret") or config.get("client_secret", "")
+    refresh_token = str(token_dict.get("refresh_token", "")).strip()
+    token_uri = token_dict.get("token_uri") or "https://oauth2.googleapis.com/token"
+
     try:
-        refresh_token = token_dict.get("refresh_token", "") if isinstance(token_dict, dict) else ""
-        if refresh_token and refresh_token.strip():
+        # Construct Credentials with full refresh configuration
+        creds = Credentials(
+            token=token_dict.get("token", ""),
+            refresh_token=refresh_token if refresh_token else None,
+            token_uri=token_uri,
+            client_id=client_id if client_id else None,
+            client_secret=client_secret if client_secret else None,
+            scopes=SCOPES,
+        )
+
+        # Proactively refresh token if expired and refresh_token is present
+        if creds.refresh_token:
+            from google.auth.transport.requests import Request
             try:
-                creds = Credentials.from_authorized_user_info(token_dict, SCOPES)
+                if creds.expired or not creds.valid:
+                    creds.refresh(Request())
+                    if creds.token:
+                        token_dict["token"] = creds.token
             except Exception:
-                creds = Credentials(token=token_dict.get("token", ""), scopes=SCOPES)
-        else:
-            creds = Credentials(token=token_dict.get("token", ""), scopes=SCOPES)
+                pass
 
         service = build("gmail", "v1", credentials=creds)
 
@@ -123,10 +166,21 @@ def send_email_via_gmail_api(
         raw_message = base64.urlsafe_b64encode(email.as_bytes()).decode()
         sent_msg = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
 
+        # Update in-memory token if auto-refreshed during execute()
+        if creds.token:
+            token_dict["token"] = creds.token
+
         return {
             "success": True,
             "status": "sent_via_gmail_api",
             "message": f"Email sent directly from your Google Account to {recipient}! (Message ID: {sent_msg.get('id')})",
         }
     except Exception as exc:
-        return {"success": False, "status": "oauth_send_error", "message": f"Gmail API delivery failed: {str(exc)}"}
+        err_str = str(exc)
+        is_token_issue = any(k in err_str.lower() for k in ["refresh", "invalid_grant", "credentials", "token", "unauthorized", "401"])
+        return {
+            "success": False,
+            "status": "oauth_token_expired" if is_token_issue else "oauth_send_error",
+            "message": f"Gmail API delivery failed: {err_str}",
+            "token_expired": is_token_issue,
+        }

@@ -26,6 +26,7 @@ class DeliveryState(TypedDict):
     success: NotRequired[bool]
     status: NotRequired[str]
     result_message: NotRequired[str]
+    oauth_token_expired: NotRequired[bool]
 
 
 def validate_node(state: DeliveryState):
@@ -56,6 +57,7 @@ def send_node(state: DeliveryState):
         "success": result["success"],
         "status": result["status"],
         "result_message": result["message"],
+        "oauth_token_expired": result.get("oauth_token_expired", False),
     }
 
 
