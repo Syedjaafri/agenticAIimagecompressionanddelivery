@@ -1,4 +1,4 @@
-import os
+from __future__ import annotations
 from pathlib import Path
 import json
 import joblib
@@ -18,15 +18,6 @@ SUPPORTED_QUALITIES = [30, 40, 50, 60, 70, 80, 90]
 st.set_page_config(page_title="Agentic AI Image Delivery", page_icon="📨", layout="wide")
 
 
-def get_secret(key: str) -> str:
-    try:
-        if key in st.secrets:
-            return str(st.secrets[key]).strip()
-    except Exception:
-        pass
-    return os.getenv(key, "").strip()
-
-
 def nearest_quality(value: float) -> int:
     return min(SUPPORTED_QUALITIES, key=lambda q: abs(q - value))
 
@@ -38,7 +29,7 @@ def load_model():
     return joblib.load(MODEL_PATH)
 
 
-def build_model_row(features, intended_use, minimum_similarity, network_mbps, max_attachment_kb):
+def build_model_row(features: dict, intended_use: str, minimum_similarity: float, network_mbps: float, max_attachment_kb: float) -> pd.DataFrame:
     return pd.DataFrame([{
         **features,
         "intended_use": intended_use,
@@ -49,15 +40,26 @@ def build_model_row(features, intended_use, minimum_similarity, network_mbps, ma
 
 
 st.title("Agentic AI-Assisted Adaptive Image Compression and Intelligent Email Delivery")
-st.caption("Optimize an image, verify its quality, and deliver it through an AI Agent-controlled email workflow.")
 
 with st.sidebar:
     st.header("Compression Settings")
-    intended_use = st.selectbox("Intended use", ["Mobile sharing", "Website", "Email", "Cloud storage", "High-quality archive"], index=2)
+    intended_use = st.selectbox(
+        "Intended use",
+        ["Mobile sharing", "Website", "Email", "Cloud storage", "High-quality archive"],
+        index=2,
+    )
     defaults = {"Mobile sharing": 0.88, "Website": 0.90, "Email": 0.91, "Cloud storage": 0.92, "High-quality archive": 0.96}
-    minimum_similarity = st.slider("Minimum visual similarity", 0.80, 0.99, defaults[intended_use], 0.01)
-    network_label = st.selectbox("Network condition", ["Slow rural link (0.256 Mbps)", "Basic mobile link (1 Mbps)", "Moderate connection (5 Mbps)", "Fast connection (10 Mbps)"])
-    network_map = {"Slow rural link (0.256 Mbps)": 0.256, "Basic mobile link (1 Mbps)": 1.0, "Moderate connection (5 Mbps)": 5.0, "Fast connection (10 Mbps)": 10.0}
+    minimum_similarity = st.slider("Minimum visual similarity (SSIM)", 0.80, 0.99, defaults[intended_use], 0.01)
+    network_label = st.selectbox(
+        "Network condition",
+        ["Slow rural link (0.256 Mbps)", "Basic mobile link (1 Mbps)", "Moderate connection (5 Mbps)", "Fast connection (10 Mbps)"]
+    )
+    network_map = {
+        "Slow rural link (0.256 Mbps)": 0.256,
+        "Basic mobile link (1 Mbps)": 1.0,
+        "Moderate connection (5 Mbps)": 5.0,
+        "Fast connection (10 Mbps)": 10.0,
+    }
     network_mbps = network_map[network_label]
     max_attachment_kb = st.number_input("Maximum attachment size (KB)", min_value=50, max_value=25_000, value=1024, step=50)
 
@@ -71,10 +73,11 @@ if "best" not in st.session_state:
     st.session_state.candidates = None
     st.session_state.ml_quality = None
     st.session_state.last_settings = None
+    st.session_state.is_already_optimal = False
 
 if uploaded:
     original_bytes = uploaded.getvalue()
-    
+
     # Reset state if uploaded file or settings change
     if st.session_state.original_bytes != original_bytes or st.session_state.last_settings != current_settings:
         st.session_state.best = None
@@ -82,6 +85,7 @@ if uploaded:
         st.session_state.ml_quality = None
         st.session_state.original_bytes = original_bytes
         st.session_state.last_settings = current_settings
+        st.session_state.is_already_optimal = False
 
     features = extract_image_features(original_bytes)
     model = load_model()
@@ -90,18 +94,63 @@ if uploaded:
         row = build_model_row(features, intended_use, minimum_similarity, network_mbps, max_attachment_kb)
         prediction = float(model.predict(row)[0])
         ml_quality = nearest_quality(prediction)
+
         candidates = generate_candidates(original_bytes, minimum_similarity, network_mbps, max_attachment_kb)
         best = choose_best_candidate(candidates)
 
-        st.session_state.best = best
-        st.session_state.candidates = candidates
         st.session_state.ml_quality = ml_quality
+        st.session_state.candidates = candidates
 
-    if st.session_state.candidates:
+        if not candidates:
+            # Uploaded image cannot be compressed further without size increase
+            st.session_state.is_already_optimal = True
+            st.session_state.best = {
+                "quality": "Original",
+                "image_bytes": original_bytes,
+                "size_kb": len(original_bytes) / 1024.0,
+                "reduction_percent": 0.0,
+                "similarity": 1.000,
+                "psnr_db": 99.0,
+                "transmission_seconds": transmission_seconds(len(original_bytes), network_mbps),
+                "acceptable": True,
+            }
+        else:
+            st.session_state.is_already_optimal = False
+            st.session_state.best = best
+
+    if st.session_state.candidates is not None:
         best = st.session_state.best
-        
-        if best is None:
-            st.error("No candidate satisfies both the visual-quality and attachment-size requirements. Increase the attachment limit or reduce the similarity requirement.")
+
+        if st.session_state.is_already_optimal:
+            st.info("ℹ️ **Image is already optimally compressed.** Any further compression would increase file size or degrade visual quality. Original image is retained as optimal.")
+            st.image(original_bytes, caption=f"Original (Optimally Compressed): {len(original_bytes)/1024:.1f} KB", use_container_width=True)
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Optimal Selected Quality", "Original")
+            c2.metric("Original Size", f"{len(original_bytes)/1024:.1f} KB")
+            c3.metric("Size Reduction", "0.0%")
+            c4.metric("Similarity (SSIM)", "1.000")
+
+            st.download_button("Download Image", original_bytes, "image.jpg", "image/jpeg", use_container_width=True)
+
+        elif best is None:
+            st.warning(f"⚠️ No candidate satisfies both the visual similarity requirement (≥ {minimum_similarity:.2f}) and attachment size limit (≤ {max_attachment_kb} KB). Increase the attachment limit or adjust the similarity requirement.")
+
+            # Show evaluated candidates so the user can see what was tested
+            if st.session_state.candidates:
+                st.subheader("Evaluated Compression Candidates")
+                table_rows = []
+                for c in st.session_state.candidates:
+                    status = "❌ Below Similarity" if not c["quality_ok"] else ("❌ Exceeds Size" if not c["attachment_ok"] else "✅ Acceptable")
+                    table_rows.append({
+                        "Quality": f"Q{c['quality']}",
+                        "Size (KB)": f"{c['size_kb']:.1f}",
+                        "Reduction": f"{c['reduction_percent']:.1f}%",
+                        "Similarity (SSIM)": f"{c['similarity']:.3f}",
+                        "Status": status,
+                    })
+                st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+
         else:
             left, right = st.columns(2)
             with left:
@@ -109,38 +158,40 @@ if uploaded:
             with right:
                 st.image(best["image_bytes"], caption=f"Optimized Q{best['quality']}: {best['size_kb']:.1f} KB", use_container_width=True)
 
-            a, b, c, d, e = st.columns(5)
-            a.metric("ML recommendation", f"Q{st.session_state.ml_quality}")
-            b.metric("Final quality", f"Q{best['quality']}")
-            c.metric("Size reduction", f"{best['reduction_percent']:.1f}%")
-            d.metric("Similarity", f"{best['similarity']:.3f}")
-            original_time = transmission_seconds(len(original_bytes), network_mbps)
-            e.metric("Estimated time saved", f"{original_time-best['transmission_seconds']:.3f} s")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Optimal Selected Quality", f"Q{best['quality']}")
+            c2.metric("Optimized Size", f"{best['size_kb']:.1f} KB")
+            c3.metric("Size Reduction", f"{best['reduction_percent']:.1f}%")
+            c4.metric("Similarity (SSIM)", f"{best['similarity']:.3f}")
 
-            # Clean dataframe formatting for visual clarity
-            formatted_list = []
-            for c_item in st.session_state.candidates:
-                row_dict = {
-                    "Quality": f"Q{c_item['quality']}",
-                    "Scale": f"{int(c_item.get('scale', 1.0)*100)}%",
-                    "Size (KB)": round(c_item["size_kb"], 1),
-                    "Reduction": f"{c_item['reduction_percent']:.1f}%",
-                    "Similarity": round(c_item["similarity"], 3),
-                    "PSNR (dB)": round(c_item["psnr_db"], 1),
-                    "Time (s)": round(c_item["transmission_seconds"], 3),
-                    "Quality OK": "✅" if c_item["quality_ok"] else "❌",
-                    "Size OK": "✅" if c_item["attachment_ok"] else "❌",
-                    "Acceptable": "✅" if c_item["acceptable"] else "❌",
-                }
-                formatted_list.append(row_dict)
-            table_df = pd.DataFrame(formatted_list)
-            st.dataframe(table_df, use_container_width=True, hide_index=True)
+            # Clean candidate table: Quality, Size, Reduction, Similarity, Status
+            table_rows = []
+            for c in st.session_state.candidates:
+                if c["quality"] == best["quality"]:
+                    status = "⭐ Optimal Selected"
+                elif c["acceptable"]:
+                    status = "✅ Acceptable"
+                elif not c["quality_ok"]:
+                    status = "❌ Below Similarity"
+                else:
+                    status = "❌ Exceeds Size"
+
+                table_rows.append({
+                    "Quality": f"Q{c['quality']}",
+                    "Size (KB)": f"{c['size_kb']:.1f}",
+                    "Reduction": f"{c['reduction_percent']:.1f}%",
+                    "Similarity (SSIM)": f"{c['similarity']:.3f}",
+                    "Status": status,
+                })
+
+            st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
             st.download_button("Download Optimized Image", best["image_bytes"], "optimized_image.jpg", "image/jpeg", use_container_width=True)
 
+        # AI Agent Email Delivery Section
+        if best is not None:
             st.divider()
             st.subheader("📬 AI Agent Email Delivery")
 
-            # Check if user returned with OAuth code in URL
             params = st.query_params
             if "code" in params:
                 try:
@@ -154,7 +205,6 @@ if uploaded:
                     st.query_params.clear()
                     st.warning(f"Google Sign-In note: {str(exc)}")
 
-            # Display stylish Sign-In notice and link button
             if "google_user_token" in st.session_state and st.session_state.google_user_token:
                 token_data = st.session_state.google_user_token
                 user_email_disp = token_data.get("user_email") if isinstance(token_data, dict) else ""
@@ -186,23 +236,23 @@ if uploaded:
             with col_rec:
                 recipient = st.text_input("Recipient Email", placeholder="e.g. recipient@gmail.com")
 
-            subject = st.text_input("Subject", value="Optimized Image")
-            message = st.text_area("Message", value="Please find the optimized image attached.")
+            subject = st.text_input("Subject", value="Optimized Image Delivery")
+            message = st.text_area("Message", value="Please find the AI-optimized image attached.")
 
             if st.button("Send Optimized Image", type="primary", use_container_width=True):
                 with st.status("AI Agent is processing the delivery task...", expanded=True) as status:
-                    st.write("Validating recipient and attachment")
-                    st.write("Preparing the optimized image attachment")
+                    st.write("Validating recipient and image attachment...")
+                    st.write("Preparing optimized image payload...")
                     token_dict = st.session_state.get("google_user_token")
                     disp_sender = user_sender_email.strip() if user_sender_email else "Production Engine"
-                    st.write(f"Sending from `{disp_sender}` to `{recipient}`")
+                    st.write(f"Delivering from `{disp_sender}` to `{recipient}`")
                     result = deliver_optimized_image(
                         recipient=recipient,
                         subject=subject,
                         message=message,
                         attachment_bytes=best["image_bytes"],
-                        attachment_name="optimized_image.jpg",
-                        original_kb=len(original_bytes)/1024,
+                        attachment_name="optimized_image.jpg" if best["quality"] != "Original" else "original_image.jpg",
+                        original_kb=len(original_bytes) / 1024.0,
                         compressed_kb=best["size_kb"],
                         selected_quality=best["quality"],
                         similarity=best["similarity"],
@@ -222,8 +272,7 @@ if uploaded:
                             st.error(result.get("result_message"))
                             st.info(f"Attempts made: {result.get('attempts', 0)}")
 
-with st.expander("Machine Learning model information"):
+with st.expander("Machine Learning Model Information"):
     if METRICS_PATH.exists():
         st.json(json.loads(METRICS_PATH.read_text()))
-    st.warning("The starter model uses synthetic demonstration data. Replace it with measured real-image records for stronger research evaluation.")
-
+    st.caption("Random Forest regressor trained on image spatial/spectral features to estimate initial baseline quality factors.")

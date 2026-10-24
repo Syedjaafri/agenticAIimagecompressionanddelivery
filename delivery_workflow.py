@@ -14,7 +14,7 @@ class DeliveryState(TypedDict):
     attachment_name: str
     original_kb: float
     compressed_kb: float
-    selected_quality: int
+    selected_quality: int | str
     similarity: float
     max_attempts: int
     attempts: int
